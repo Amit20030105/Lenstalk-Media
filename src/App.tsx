@@ -21,12 +21,15 @@ import {
   Camera,
   Sparkles,
   Star,
-  ZapOff
+  ZapOff,
+  Loader2
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { ChatBot } from './components/ChatBot';
+import { GoogleGenAI } from "@google/genai";
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import Cookies from 'js-cookie';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -209,10 +212,10 @@ const Navbar = () => {
         </div>
 
         <div className="hidden md:flex items-center gap-10">
-          {['Services', 'Work', 'Why Us', 'Contact'].map((item) => (
+          {['Services', 'Work', 'AI Studio', 'Why Us', 'Contact'].map((item) => (
             <a 
               key={item} 
-              href={`#${item.toLowerCase().replace(' ', '')}`}
+              href={`#${item.toLowerCase().replace(' ', '-')}`}
               className="text-[11px] font-bold hover:text-brand-primary transition-all uppercase tracking-[0.2em] text-slate-400 relative group/nav"
             >
               {item}
@@ -423,7 +426,7 @@ const Hero = () => {
           
           <motion.h1 
             style={{ x: textX, y: textY }}
-            className="text-7xl md:text-[12rem] font-black tracking-tighter leading-[0.8] uppercase mb-10 text-white"
+            className="text-7xl md:text-[12rem] font-black tracking-tighter leading-[0.8] uppercase mb-10 text-white font-serif"
           >
             <motion.span 
               initial={{ opacity: 0, y: 100, skewY: 10 }}
@@ -509,6 +512,241 @@ const Hero = () => {
   );
 };
 
+const Marquee = () => {
+  const brands = ["Odisha Tourism", "TechHub", "Royal Estates", "Bloom Studio", "Vanguard", "Nexus", "Elite", "Prime"];
+  
+  return (
+    <div className="py-10 border-b border-white/5 bg-slate-950/20 overflow-hidden">
+      <div className="flex whitespace-nowrap animate-marquee">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="flex items-center gap-20 px-10">
+            {brands.map((brand) => (
+              <span key={brand} className="text-2xl font-black uppercase tracking-[0.3em] text-white/20 hover:text-brand-primary transition-colors cursor-default font-serif">
+                {brand}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const CreativeAIStudio = () => {
+  const [prompt, setPrompt] = useState('');
+  const [personality, setPersonality] = useState('Cinematic');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const personalities = ['Cinematic', 'Minimalist', 'Brutalist', 'Vibrant', 'Ethereal'];
+
+  const startListening = () => {
+    if (!('webkitSpeechRecognition' in window)) {
+      setError("Speech recognition not supported in this browser.");
+      return;
+    }
+    const recognition = new (window as any).webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setPrompt(transcript);
+    };
+    recognition.start();
+  };
+
+  const generateImage = async () => {
+    if (!prompt.trim()) return;
+    setIsGenerating(true);
+    setError(null);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const fullPrompt = `Style: ${personality}. Subject: ${prompt}. High quality, professional branding asset.`;
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-image-preview',
+        contents: { parts: [{ text: fullPrompt }] },
+        config: {
+          imageConfig: {
+            aspectRatio: "16:9",
+            imageSize: "1K"
+          }
+        }
+      });
+
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData) {
+          setGeneratedImage(`data:image/png;base64,${part.inlineData.data}`);
+          break;
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Failed to generate image. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <section id="ai-studio" className="py-32 px-6 relative overflow-hidden">
+      <div className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+          <div>
+            <div className="text-brand-primary text-[10px] uppercase tracking-[0.4em] mb-4 font-mono">Nano Banana 2 Powered</div>
+            <h2 className="text-5xl md:text-7xl font-black tracking-tighter uppercase mb-8 font-serif leading-none">
+              Creative <br />
+              <span className="text-brand-primary">AI Studio</span>
+            </h2>
+            <p className="text-slate-400 text-lg font-light leading-relaxed mb-10 max-w-md">
+              Experience the future of branding. Use our proprietary AI to visualize your brand concepts in real-time.
+            </p>
+            
+            <div className="flex flex-wrap gap-3 mb-8">
+              {personalities.map((p) => (
+                <button 
+                  key={p}
+                  onClick={() => setPersonality(p)}
+                  className={cn(
+                    "px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border",
+                    personality === p 
+                      ? "bg-brand-primary border-brand-primary text-white blue-glow" 
+                      : "bg-white/5 border-white/10 text-slate-500 hover:border-white/30"
+                  )}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative group">
+              <input 
+                type="text" 
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && generateImage()}
+                placeholder="Describe your vision..."
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-8 py-6 pr-24 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10 outline-none transition-all text-white placeholder:text-slate-600"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                <button 
+                  onClick={startListening}
+                  className={cn(
+                    "p-3 rounded-xl transition-all",
+                    isListening ? "bg-red-500 text-white animate-pulse" : "bg-white/10 text-slate-400 hover:text-white"
+                  )}
+                >
+                  <motion.div animate={isListening ? { scale: [1, 1.2, 1] } : {}}>
+                    <Zap className="w-5 h-5" />
+                  </motion.div>
+                </button>
+                <button 
+                  onClick={generateImage}
+                  disabled={isGenerating}
+                  className="bg-brand-primary text-white p-4 rounded-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100"
+                >
+                  {isGenerating ? <Loader2 className="w-6 h-6 animate-spin" /> : <Sparkles className="w-6 h-6" />}
+                </button>
+              </div>
+            </div>
+            {error && <p className="text-red-500 text-xs mt-4 font-mono">{error}</p>}
+          </div>
+
+          <div className="relative aspect-video rounded-[2.5rem] overflow-hidden glass-panel border-white/5 group">
+            <AnimatePresence mode="wait">
+              {generatedImage ? (
+                <div className="relative w-full h-full">
+                  <motion.img 
+                    key={generatedImage}
+                    initial={{ opacity: 0, scale: 1.1 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    src={generatedImage} 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                  <motion.button
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = generatedImage;
+                      link.download = `lenstalk-ai-${Date.now()}.png`;
+                      link.click();
+                    }}
+                    className="absolute bottom-6 right-6 bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl text-white hover:bg-brand-primary hover:border-brand-primary transition-all group/dl"
+                  >
+                    <ArrowUpRight className="w-6 h-6 group-hover:rotate-45 transition-transform" />
+                  </motion.button>
+                </div>
+              ) : (
+                <motion.div 
+                  key="placeholder"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="w-full h-full flex flex-col items-center justify-center text-slate-700 gap-4"
+                >
+                  <div className="w-20 h-20 rounded-full border-2 border-dashed border-slate-800 flex items-center justify-center animate-spin-slow">
+                    <Palette className="w-8 h-8" />
+                  </div>
+                  <span className="text-[10px] uppercase tracking-[0.3em] font-black">Waiting for your vision</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            {isGenerating && (
+              <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-20">
+                <div className="flex flex-col items-center gap-6">
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map((i) => (
+                      <motion.div
+                        key={i}
+                        animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
+                        transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                        className="w-3 h-3 bg-brand-primary rounded-full"
+                      />
+                    ))}
+                  </div>
+                  <span className="text-[10px] uppercase tracking-[0.5em] text-white font-black animate-pulse">Dreaming...</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const Stats = () => {
+  const stats = [
+    { label: "Projects Delivered", value: "250+" },
+    { label: "Happy Clients", value: "120+" },
+    { label: "Awards Won", value: "15+" },
+    { label: "Team Members", value: "25+" }
+  ];
+
+  return (
+    <section className="py-20 border-y border-white/5 bg-slate-950/50">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-12">
+          {stats.map((stat, i) => (
+            <div key={i} className="text-center">
+              <div className="text-4xl md:text-6xl font-black text-white mb-2 font-serif">{stat.value}</div>
+              <div className="text-[10px] uppercase tracking-[0.4em] text-brand-primary font-mono">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const WhyUs = () => {
   const sectionRef = useRef<HTMLDivElement>(null);
 
@@ -516,22 +754,22 @@ const WhyUs = () => {
     <section id="whyus" ref={sectionRef} className="py-32 px-6 relative overflow-hidden bg-slate-950/50">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-24">
-          <div className="text-brand-primary text-[10px] uppercase tracking-[0.4em] mb-4">The LensTalk Advantage</div>
-          <h2 className="text-5xl md:text-8xl font-black tracking-tighter uppercase mb-8">
+          <div className="text-brand-primary text-[10px] uppercase tracking-[0.4em] mb-4 font-mono">The LensTalk Advantage</div>
+          <h2 className="text-5xl md:text-8xl font-black tracking-tighter uppercase mb-8 font-serif">
             Why We Are <span className="text-brand-primary">Best</span> In <br />
             <span className="text-white/40 italic">Bhubaneswar</span>
           </h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 perspective-2000">
-          {/* Main Feature */}
+          {/* Main Feature - Large Bento */}
           <motion.div 
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.1 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
             whileHover={{ rotateX: 2, rotateY: -2, scale: 1.01 }}
-            className="md:col-span-8 glass-card p-12 rounded-[2.5rem] relative overflow-hidden group/card"
+            className="md:col-span-8 md:row-span-2 glass-card p-12 rounded-[2.5rem] relative overflow-hidden group/card min-h-[500px]"
           >
             <div className="absolute top-0 right-0 p-12 opacity-5 group-hover/card:opacity-10 transition-opacity">
               <Award className="w-64 h-64 text-brand-primary" />
@@ -549,58 +787,58 @@ const WhyUs = () => {
               <div className="w-16 h-16 bg-brand-primary/10 rounded-2xl flex items-center justify-center mb-10 border border-brand-primary/20 group-hover/card:scale-110 group-hover/card:rotate-6 transition-all duration-500">
                 <Award className="w-8 h-8 text-brand-primary" />
               </div>
-              <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tighter mb-6 text-white leading-none">Local Roots, <br /><span className="text-brand-primary">Global Standards</span></h3>
+              <h3 className="text-4xl md:text-6xl font-black uppercase tracking-tighter mb-6 text-white leading-none font-serif">Local Roots, <br /><span className="text-brand-primary">Global Standards</span></h3>
               <p className="text-slate-400 text-lg max-w-xl font-light leading-relaxed">
                 We understand the heart of Odisha. Our campaigns resonate with the local culture while maintaining the technical excellence of top-tier global agencies.
               </p>
             </div>
           </motion.div>
 
-          {/* Secondary Feature */}
+          {/* Secondary Feature - Small Bento */}
           <motion.div 
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.1 }}
             transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
             whileHover={{ rotateX: -2, rotateY: 2, scale: 1.02 }}
-            className="md:col-span-4 glass-card p-12 rounded-3xl relative overflow-hidden group bg-gradient-to-br from-brand-primary/20 to-transparent"
+            className="md:col-span-4 glass-card p-10 rounded-3xl relative overflow-hidden group bg-gradient-to-br from-brand-primary/20 to-transparent"
           >
             <div className="w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center mb-8 border border-white/10 group-hover:rotate-12 transition-transform">
               <BarChart3 className="w-7 h-7 text-white" />
             </div>
-            <h3 className="text-2xl font-black uppercase tracking-tighter mb-4 text-white">Data-Driven ROI</h3>
+            <h3 className="text-2xl font-black uppercase tracking-tighter mb-4 text-white font-serif">Data-Driven ROI</h3>
             <p className="text-slate-400 text-sm font-light leading-relaxed">
-              Every pixel we design and every ad we run is backed by rigorous data analysis to ensure your business grows.
+              Every pixel we design and every ad we run is backed by rigorous data analysis.
             </p>
             <div className="absolute bottom-0 right-0 w-32 h-32 bg-white/5 blur-2xl rounded-full" />
           </motion.div>
 
-          {/* Third Feature */}
+          {/* Third Feature - Small Bento */}
           <motion.div 
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.1 }}
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
             whileHover={{ rotateX: 2, rotateY: 2, scale: 1.02 }}
-            className="md:col-span-4 glass-card p-12 rounded-3xl relative overflow-hidden group"
+            className="md:col-span-4 glass-card p-10 rounded-3xl relative overflow-hidden group"
           >
             <div className="w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center mb-8 border border-white/10 group-hover:scale-110 transition-transform">
               <Users className="w-7 h-7 text-white" />
             </div>
-            <h3 className="text-2xl font-black uppercase tracking-tighter mb-4 text-white">Client-First Philosophy</h3>
+            <h3 className="text-2xl font-black uppercase tracking-tighter mb-4 text-white font-serif">Client-First</h3>
             <p className="text-slate-400 text-sm font-light leading-relaxed">
-              We don't just have clients; we have partners. Your success is our only metric of performance.
+              We don't just have clients; we have partners. Your success is our only metric.
             </p>
           </motion.div>
 
-          {/* Fourth Feature */}
+          {/* Fourth Feature - Medium Bento */}
           <motion.div 
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.1 }}
             transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
             whileHover={{ rotateX: -2, rotateY: -2, scale: 1.02 }}
-            className="md:col-span-8 glass-card p-12 rounded-3xl relative overflow-hidden group border-brand-primary/30"
+            className="md:col-span-6 glass-card p-12 rounded-3xl relative overflow-hidden group border-brand-primary/30"
           >
             <div className="absolute inset-0 bg-brand-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative z-10 flex flex-col md:flex-row items-center gap-12 h-full">
@@ -608,12 +846,31 @@ const WhyUs = () => {
                 <div className="w-14 h-14 bg-brand-primary/10 rounded-xl flex items-center justify-center mb-8 border border-brand-primary/20 group-hover:rotate-[-10deg] transition-transform">
                   <Layers className="w-7 h-7 text-brand-primary" />
                 </div>
-                <h3 className="text-3xl font-black uppercase tracking-tighter mb-4 text-white">End-to-End Production</h3>
+                <h3 className="text-3xl font-black uppercase tracking-tighter mb-4 text-white font-serif">End-to-End</h3>
                 <p className="text-slate-400 text-sm font-light leading-relaxed">
-                  From cinematic video production to high-conversion digital ads, we handle the entire creative lifecycle in-house.
+                  From cinematic video production to high-conversion digital ads, we handle it all.
                 </p>
               </div>
-              <div className="hidden md:block w-48 h-48 bg-brand-primary/10 rounded-full blur-3xl animate-pulse group-hover:scale-150 transition-transform duration-1000" />
+            </div>
+          </motion.div>
+
+          {/* Fifth Feature - Medium Bento */}
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.1 }}
+            transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
+            whileHover={{ rotateX: 2, rotateY: 2, scale: 1.02 }}
+            className="md:col-span-6 glass-card p-12 rounded-3xl relative overflow-hidden group bg-brand-primary/5"
+          >
+            <div className="relative z-10">
+              <div className="w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center mb-8 border border-white/10 group-hover:scale-110 transition-transform">
+                <Sparkles className="w-7 h-7 text-brand-primary" />
+              </div>
+              <h3 className="text-3xl font-black uppercase tracking-tighter mb-4 text-white font-serif">AI-First Agency</h3>
+              <p className="text-slate-400 text-sm font-light leading-relaxed">
+                We leverage cutting-edge AI to accelerate creativity and optimize performance beyond human limits.
+              </p>
             </div>
           </motion.div>
         </div>
@@ -630,6 +887,13 @@ const PortfolioItem = ({ item, index }: { item: typeof BRAND_CONFIG.portfolio[0]
   const springConfig = { damping: 20, stiffness: 100 };
   const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [10, -10]), springConfig);
   const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-10, 10]), springConfig);
+
+  // Parallax transforms
+  const imgX = useSpring(useTransform(mouseX, [-0.5, 0.5], [15, -15]), springConfig);
+  const imgY = useSpring(useTransform(mouseY, [-0.5, 0.5], [15, -15]), springConfig);
+  
+  const contentX = useSpring(useTransform(mouseX, [-0.5, 0.5], [-20, 20]), springConfig);
+  const contentY = useSpring(useTransform(mouseY, [-0.5, 0.5], [-20, 20]), springConfig);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     const rect = itemRef.current?.getBoundingClientRect();
@@ -652,24 +916,30 @@ const PortfolioItem = ({ item, index }: { item: typeof BRAND_CONFIG.portfolio[0]
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
+      whileHover={{ scale: 1.02, z: 50 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
       className="group relative aspect-[16/10] overflow-hidden rounded-3xl glass-panel border-white/5 cursor-pointer perspective-2000"
     >
       <motion.img 
         src={item.image} 
         alt={item.title} 
-        className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 opacity-70 group-hover:opacity-100"
+        style={{ x: imgX, y: imgY }}
+        className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-125 opacity-70 group-hover:opacity-100"
         referrerPolicy="no-referrer"
       />
       
       {item.type === 'video' && (
-        <div className="absolute top-6 right-6 bg-brand-primary/80 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 z-20">
+        <motion.div 
+          style={{ x: contentX, y: contentY, translateZ: 120 }}
+          className="absolute top-6 right-6 bg-brand-primary/80 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 z-20"
+        >
           <Video className="w-3.5 h-3.5" /> Cinematic Post
-        </div>
+        </motion.div>
       )}
 
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-700 flex flex-col justify-end p-12 z-10">
         <motion.div 
-          style={{ translateZ: 100 }}
+          style={{ x: contentX, y: contentY, translateZ: 100 }}
           className="transform-gpu"
         >
           <div className="text-[11px] uppercase tracking-[0.4em] text-brand-primary mb-4 font-black flex items-center gap-2">
@@ -691,6 +961,45 @@ const PortfolioItem = ({ item, index }: { item: typeof BRAND_CONFIG.portfolio[0]
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full border border-white/10 rounded-3xl scale-95 opacity-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-700" />
       </div>
     </motion.div>
+  );
+};
+
+const Process = () => {
+  const steps = [
+    { title: "Discovery", desc: "We dive deep into your brand's DNA and market landscape.", icon: Search },
+    { title: "Strategy", desc: "Crafting a bespoke roadmap for your digital dominance.", icon: Target },
+    { title: "Creation", desc: "Bringing vision to life with world-class production.", icon: Palette },
+    { title: "Growth", desc: "Scaling your impact with data-driven optimization.", icon: BarChart3 }
+  ];
+
+  return (
+    <section className="py-32 px-6 relative overflow-hidden">
+      <div className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+          {steps.map((step, idx) => (
+            <motion.div 
+              key={idx}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: idx * 0.1 }}
+              className="relative group"
+            >
+              <div className="text-8xl font-black text-white/5 absolute -top-10 -left-4 group-hover:text-brand-primary/10 transition-colors font-serif">
+                0{idx + 1}
+              </div>
+              <div className="relative z-10">
+                <div className="w-12 h-12 bg-brand-primary/10 rounded-xl flex items-center justify-center mb-6 border border-brand-primary/20">
+                  <step.icon className="w-6 h-6 text-brand-primary" />
+                </div>
+                <h3 className="text-xl font-bold uppercase tracking-widest mb-4 text-white">{step.title}</h3>
+                <p className="text-slate-400 text-sm font-light leading-relaxed">{step.desc}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 };
 
@@ -782,11 +1091,114 @@ const Services = () => {
   );
 };
 
+const CreativeManifesto = () => {
+  return (
+    <section className="py-40 px-6 relative overflow-hidden bg-slate-950">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col gap-12">
+          <motion.div 
+            initial={{ opacity: 0, x: -100 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="text-brand-primary text-[10px] uppercase tracking-[0.5em] font-mono"
+          >
+            Our Manifesto
+          </motion.div>
+          <h2 className="text-4xl md:text-8xl font-black tracking-tighter uppercase leading-[0.9] font-serif">
+            <motion.span 
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="block"
+            >
+              We don't just <span className="text-brand-primary italic">Capture</span>
+            </motion.span>
+            <motion.span 
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+              className="block text-white/20"
+            >
+              We Create <span className="text-white">Legacies</span>
+            </motion.span>
+            <motion.span 
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.4 }}
+              className="block"
+            >
+              In the heart of <span className="text-brand-primary">Odisha</span>
+            </motion.span>
+          </h2>
+          <motion.p 
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.6 }}
+            className="max-w-2xl text-slate-500 text-xl font-light leading-relaxed"
+          >
+            LensTalk Media is more than an agency. We are a collective of visionaries, storytellers, and tech-enthusiasts dedicated to pushing the boundaries of what's possible in the digital realm.
+          </motion.p>
+        </div>
+      </div>
+      
+      {/* Decorative Floating Text */}
+      <div className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 rotate-90 opacity-[0.02] pointer-events-none">
+        <div className="text-[20rem] font-black uppercase tracking-tighter whitespace-nowrap">
+          CREATIVITY IS POWER
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const Testimonials = () => {
+  const testimonials = [
+    { name: "Rajesh Mohanty", role: "CEO, Odisha Tech", text: "LensTalk transformed our digital presence. Their cinematic vision is unmatched in Bhubaneswar." },
+    { name: "Priya Das", role: "Founder, Bloom Studio", text: "The strategy they developed for our brand storytelling was exactly what we needed to scale." },
+    { name: "Amit Kumar", role: "Marketing Head, Royal Estates", text: "Data-driven results and incredible creative talent. A true partner for any growing business." }
+  ];
+
+  return (
+    <section className="py-32 px-6 bg-slate-950/20">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-20">
+          <div className="text-brand-primary text-[10px] uppercase tracking-[0.4em] mb-4 font-mono">Client Voices</div>
+          <h2 className="text-4xl md:text-6xl font-black tracking-tighter uppercase font-serif">Trusted by <span className="text-brand-primary">Visionaries</span></h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {testimonials.map((t, i) => (
+            <motion.div 
+              key={i}
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.1 }}
+              className="glass-panel p-10 rounded-3xl border-white/5 relative group"
+            >
+              <div className="absolute top-6 right-8 text-brand-primary/20">
+                <Heart className="w-8 h-8 fill-current" />
+              </div>
+              <p className="text-slate-300 text-lg font-light italic mb-8 leading-relaxed">"{t.text}"</p>
+              <div>
+                <div className="text-white font-bold uppercase tracking-widest text-sm">{t.name}</div>
+                <div className="text-brand-primary text-[10px] uppercase tracking-widest">{t.role}</div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const Work = () => {
   const sectionRef = useRef<HTMLDivElement>(null);
 
   return (
-    <section id="work" ref={sectionRef} className="py-32 px-6 bg-slate-950/30">
+    <section id="work" ref={sectionRef} className="py-32 px-6 bg-slate-950/30 relative">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-10 mb-24">
           <div className="max-w-2xl">
@@ -954,30 +1366,58 @@ const Footer = () => {
   return (
     <footer className="py-20 px-6 border-t border-white/5 bg-slate-950">
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-12 mb-20">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-brand-primary rounded-lg flex items-center justify-center">
-              <Camera className="text-white w-6 h-6" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20">
+          <div className="col-span-2">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-10 h-10 bg-brand-primary rounded-lg flex items-center justify-center">
+                <Camera className="text-white w-6 h-6" />
+              </div>
+              <span className="text-2xl font-black tracking-tighter uppercase text-white font-serif">
+                Lens<span className="text-brand-primary">Talk</span>
+              </span>
             </div>
-            <span className="text-2xl font-black tracking-tighter uppercase text-white">LensTalk</span>
+            <p className="text-slate-400 max-w-sm text-lg font-light leading-relaxed mb-8">
+              Bhubaneswar's premier digital agency. We don't just build brands; we build legacies.
+            </p>
+            <div className="flex gap-4">
+              {[Facebook, Globe, Users].map((Icon, i) => (
+                <a key={i} href="#" className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-brand-primary hover:border-brand-primary transition-all text-slate-400 hover:text-white">
+                  <Icon className="w-5 h-5" />
+                </a>
+              ))}
+            </div>
           </div>
-          
-          <div className="flex flex-wrap gap-10">
-            {['Twitter', 'Instagram', 'LinkedIn', 'Facebook'].map((social) => (
-              <a key={social} href="#" className="text-[11px] font-bold uppercase tracking-widest text-slate-500 hover:text-brand-primary transition-colors">
-                {social}
-              </a>
-            ))}
+          <div>
+            <h4 className="text-sm font-bold uppercase tracking-widest text-white mb-8">Navigation</h4>
+            <ul className="space-y-4">
+              {['Services', 'Work', 'Why Us', 'Contact'].map(item => (
+                <li key={item}>
+                  <a href={`#${item.toLowerCase().replace(' ', '')}`} className="text-slate-400 hover:text-brand-primary transition-colors text-sm uppercase tracking-widest">{item}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h4 className="text-sm font-bold uppercase tracking-widest text-white mb-8">Contact</h4>
+            <ul className="space-y-4 text-sm text-slate-400 font-light">
+              <li className="flex items-center gap-3">
+                <MapPin className="w-4 h-4 text-brand-primary" />
+                Bhubaneswar, Odisha
+              </li>
+              <li className="flex items-center gap-3">
+                <Globe className="w-4 h-4 text-brand-primary" />
+                hello@lenstalk.media
+              </li>
+            </ul>
           </div>
         </div>
-        
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-10 border-t border-white/5">
-          <div className="text-[10px] uppercase tracking-[0.3em] text-slate-600">
-            © 2024 LensTalk Media. Crafted in Bhubaneswar.
-          </div>
+        <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
+          <p className="text-slate-500 text-[10px] uppercase tracking-[0.3em]">
+            © 2026 LensTalk Media. All Rights Reserved.
+          </p>
           <div className="flex gap-8">
-            <a href="#" className="text-[9px] uppercase tracking-widest text-slate-600 hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="text-[9px] uppercase tracking-widest text-slate-600 hover:text-white transition-colors">Terms of Service</a>
+            <a href="#" className="text-slate-500 hover:text-white text-[10px] uppercase tracking-[0.3em] transition-colors">Privacy Policy</a>
+            <a href="#" className="text-slate-500 hover:text-white text-[10px] uppercase tracking-[0.3em] transition-colors">Terms of Service</a>
           </div>
         </div>
       </div>
@@ -985,21 +1425,95 @@ const Footer = () => {
   );
 };
 
+const CookieConsent = () => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const consent = Cookies.get('cookie-consent');
+    if (!consent) {
+      const timer = setTimeout(() => setIsVisible(true), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const handleAccept = () => {
+    Cookies.set('cookie-consent', 'true', { 
+      expires: 365, 
+      sameSite: 'none', 
+      secure: true 
+    });
+    setIsVisible(false);
+  };
+
+  return (
+    <AnimatePresence>
+      {isVisible && (
+        <motion.div
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 100, opacity: 0 }}
+          className="fixed bottom-8 left-8 right-8 md:left-auto md:right-8 md:w-[400px] z-[100]"
+        >
+          <div className="glass-panel p-8 rounded-[2rem] border border-white/10 shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/10 blur-[60px] -translate-y-1/2 translate-x-1/2" />
+            
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-brand-primary/20 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-brand-primary" />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Cookie Policy</span>
+              </div>
+              
+              <h4 className="text-xl font-black tracking-tighter text-white mb-3 uppercase">Enhancing Your Experience</h4>
+              <p className="text-slate-400 text-xs leading-relaxed mb-6 font-light">
+                We use cookies to personalize content and analyze our traffic. By clicking "Accept", you consent to our use of cookies.
+              </p>
+              
+              <div className="flex gap-4">
+                <button 
+                  onClick={handleAccept}
+                  className="flex-1 bg-brand-primary text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all blue-glow"
+                >
+                  Accept All
+                </button>
+                <button 
+                  onClick={() => setIsVisible(false)}
+                  className="px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-colors border border-white/5 hover:border-white/10"
+                >
+                  Decline
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 export default function App() {
   return (
-    <div className="min-h-screen selection:bg-brand-primary selection:text-white bg-brand-bg overflow-x-hidden">
+    <div className="relative min-h-screen selection:bg-brand-primary selection:text-white bg-brand-bg overflow-x-hidden">
       <CustomCursor />
       <MagicalBackground />
       <Navbar />
-      <main>
+      <main className="relative">
         <Hero />
+        <Marquee />
+        <Stats />
+        <Process />
+        <CreativeManifesto />
+        <CreativeAIStudio />
         <WhyUs />
         <Services />
         <Work />
+        <Testimonials />
         <Contact />
       </main>
       <Footer />
       <ChatBot />
+      <CookieConsent />
     </div>
   );
 }

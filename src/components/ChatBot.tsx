@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, X, Send, Bot, User, Calendar, Loader2, Volume2, VolumeX } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { cn } from '../lib/utils';
 
@@ -38,16 +39,35 @@ export const ChatBot = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
+  const [sessionVisits, setSessionVisits] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const voiceRequestIdRef = useRef(0);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const fetchSession = async () => {
+      try {
+        const res = await fetch('/api/session');
+        const data = await res.json();
+        setSessionVisits(data.visits);
+      } catch (e) {
+        console.error("Session error:", e);
+      }
+    };
+    if (isOpen) {
+      fetchSession();
     }
-  }, [messages]);
+  }, [isOpen]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading, isSpeaking]);
 
   const stopVoice = () => {
     voiceRequestIdRef.current++; // Invalidate any pending requests
@@ -190,8 +210,15 @@ export const ChatBot = () => {
                 </div>
                 <div>
                   <div className="text-sm font-black uppercase tracking-widest">LensTalk AI</div>
-                  <div className="text-[9px] text-brand-primary uppercase tracking-widest flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-brand-primary animate-pulse" /> Online
+                  <div className="text-[9px] text-brand-primary uppercase tracking-widest flex items-center gap-2">
+                    <span className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-primary animate-pulse" /> Online
+                    </span>
+                    {sessionVisits !== null && (
+                      <span className="text-slate-500 border-l border-white/10 pl-2">
+                        Session #{sessionVisits}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -216,47 +243,74 @@ export const ChatBot = () => {
             </div>
 
             {/* Messages */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-hide">
-              {messages.map((m, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ 
-                    duration: 0.4, 
-                    ease: [0.23, 1, 0.32, 1],
-                    delay: 0.05 
-                  }}
-                  className={cn(
-                    "flex gap-3 max-w-[88%]",
-                    m.role === 'user' ? "ml-auto flex-row-reverse" : ""
-                  )}
-                >
-                  <div className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 shadow-lg",
-                    m.role === 'user' ? "bg-slate-800 border border-white/10" : "bg-brand-primary/20 border border-brand-primary/30"
-                  )}>
-                    {m.role === 'user' ? <User className="w-4 h-4 text-slate-300" /> : <Bot className="w-4 h-4 text-brand-primary" />}
-                  </div>
-                  <div className={cn(
-                    "p-4 rounded-2xl text-[13px] leading-relaxed relative group shadow-sm transition-all duration-300",
-                    m.role === 'user' 
-                      ? "bg-gradient-to-br from-brand-primary to-blue-700 text-white rounded-tr-none blue-glow-sm" 
-                      : "bg-white/10 text-slate-100 rounded-tl-none border border-white/10 backdrop-blur-md"
-                  )}>
-                    {m.text}
-                    {m.role === 'model' && isVoiceEnabled && (
-                      <button 
-                        onClick={() => playVoice(m.text)}
-                        className="absolute -right-9 top-0 p-2 opacity-0 group-hover:opacity-100 transition-all text-slate-500 hover:text-brand-primary hover:scale-110"
-                        title="Replay Voice"
-                      >
-                        <Volume2 className="w-4 h-4" />
-                      </button>
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+              <AnimatePresence initial={false} mode="popLayout">
+                {messages.map((m, i) => (
+                  <motion.div
+                    key={`${m.role}-${i}`}
+                    layout
+                    initial={{ opacity: 0, y: 20, scale: 0.9, originX: m.role === 'user' ? 1 : 0 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ 
+                      type: "spring",
+                      stiffness: 260,
+                      damping: 20,
+                      delay: 0.05 
+                    }}
+                    className={cn(
+                      "flex gap-3 max-w-[90%]",
+                      m.role === 'user' ? "ml-auto flex-row-reverse" : ""
                     )}
-                  </div>
-                </motion.div>
-              ))}
+                  >
+                    <motion.div 
+                      initial={{ scale: 0, rotate: -45 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                      className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 shadow-xl border",
+                        m.role === 'user' 
+                          ? "bg-slate-900 border-white/10" 
+                          : "bg-brand-primary/20 border-brand-primary/30"
+                      )}
+                    >
+                      {m.role === 'user' ? <User className="w-4 h-4 text-slate-300" /> : <Bot className="w-4 h-4 text-brand-primary" />}
+                    </motion.div>
+                    
+                    <div className="flex flex-col gap-1">
+                      <div className={cn(
+                        "p-4 rounded-2xl text-[13px] leading-relaxed relative group shadow-lg transition-all duration-500",
+                        m.role === 'user' 
+                          ? "bg-gradient-to-br from-brand-primary via-blue-600 to-blue-700 text-white rounded-tr-none border border-white/10" 
+                          : "bg-white/5 text-slate-100 rounded-tl-none border border-white/10 backdrop-blur-xl hover:bg-white/10"
+                      )}>
+                        {m.role === 'user' ? (
+                          m.text
+                        ) : (
+                          <div className="markdown-body">
+                            <ReactMarkdown>{m.text}</ReactMarkdown>
+                          </div>
+                        )}
+                        {m.role === 'model' && isVoiceEnabled && (
+                          <button 
+                            onClick={() => playVoice(m.text)}
+                            className="absolute -right-10 top-0 p-2 opacity-0 group-hover:opacity-100 transition-all text-slate-500 hover:text-brand-primary hover:scale-125"
+                            title="Replay Voice"
+                          >
+                            <Volume2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <span className={cn(
+                        "text-[9px] uppercase tracking-widest opacity-40 font-bold",
+                        m.role === 'user' ? "text-right" : "text-left"
+                      )}>
+                        {m.role === 'user' ? 'You' : 'LensTalk AI'}
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
+                <div ref={messagesEndRef} />
+              </AnimatePresence>
               {isSpeaking && (
                 <motion.div 
                   initial={{ opacity: 0 }}
@@ -284,34 +338,36 @@ export const ChatBot = () => {
               )}
               {isLoading && (
                 <motion.div 
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, y: 10, scale: 0.9, originX: 0 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
                   className="flex gap-3"
                 >
-                  <div className="w-8 h-8 rounded-full bg-brand-primary/20 flex items-center justify-center shrink-0 mt-1 border border-brand-primary/30 shadow-lg">
+                  <div className="w-8 h-8 rounded-full bg-brand-primary/20 flex items-center justify-center shrink-0 mt-1 border border-brand-primary/30 shadow-xl">
                     <Bot className="w-4 h-4 text-brand-primary animate-pulse" />
                   </div>
-                  <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl rounded-tl-none border border-white/10 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="flex gap-1.5">
-                        {[0, 1, 2].map((i) => (
-                          <motion.div
-                            key={i}
-                            animate={{ 
-                              scale: [1, 1.4, 1],
-                              opacity: [0.3, 1, 0.3],
-                            }}
-                            transition={{ 
-                              duration: 1.2, 
-                              repeat: Infinity, 
-                              delay: i * 0.2,
-                              ease: "easeInOut"
-                            }}
-                            className="w-1.5 h-1.5 rounded-full bg-brand-primary blue-glow-sm"
-                          />
-                        ))}
+                  <div className="flex flex-col gap-1">
+                    <div className="bg-white/5 backdrop-blur-xl p-4 rounded-2xl rounded-tl-none border border-white/10 shadow-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="flex gap-1.5">
+                          {[0, 1, 2].map((i) => (
+                            <motion.div
+                              key={i}
+                              animate={{ 
+                                scale: [1, 1.4, 1],
+                                opacity: [0.3, 1, 0.3],
+                              }}
+                              transition={{ 
+                                duration: 1.2, 
+                                repeat: Infinity, 
+                                delay: i * 0.2,
+                                ease: "easeInOut"
+                              }}
+                              className="w-1.5 h-1.5 rounded-full bg-brand-primary blue-glow-sm"
+                            />
+                          ))}
+                        </div>
+                        <span className="text-[9px] uppercase tracking-[0.2em] text-brand-primary/70 font-black">LensTalk AI is thinking</span>
                       </div>
-                      <span className="text-[9px] uppercase tracking-[0.3em] text-brand-primary/70 font-black">LensTalk AI is thinking</span>
                     </div>
                   </div>
                 </motion.div>
@@ -327,7 +383,7 @@ export const ChatBot = () => {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSend()}
                   placeholder="Type your message..."
-                  className="w-full bg-white/5 border border-white/10 rounded-full px-6 py-3 pr-12 focus:border-brand-primary outline-none transition-all text-sm"
+                  className="w-full bg-white/5 border border-white/10 rounded-full px-6 py-3 pr-12 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all text-sm"
                 />
                 <button
                   onClick={handleSend}
