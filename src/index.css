@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-brand-primary: #3B82F6;
+  --color-brand-accent: #60A5FA;
+  --color-brand-bg: #020617;
+}
+
+@layer base {
+  body {
+    @apply bg-brand-bg text-slate-100 font-mono selection:bg-brand-primary selection:text-white overflow-x-hidden;
+    cursor: none; /* Custom cursor will be added in React */
+  }
+}
+
+.perspective-2000 {
+  perspective: 2000px;
+}
+
+.glass-panel {
+  @apply bg-white/5 border border-white/10 backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
+}
+
+.glass-card {
+  @apply bg-slate-900/60 border border-white/10 backdrop-blur-xl hover:bg-slate-800/80 transition-all duration-700 shadow-[0_20px_50px_rgba(0,0,0,0.5)];
+}
+
+.blue-glow {
+  @apply shadow-[0_0_50px_-10px_rgba(59,130,246,0.6)];
+}
+
+.text-gradient {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-white to-blue-600;
+}
+
+.magical-border {
+  position: relative;
+  background: linear-gradient(90deg, #3B82F6, #60A5FA, #3B82F6);
+  background-size: 200% 100%;
+  animation: border-flow 3s linear infinite;
+}
+
+@keyframes border-flow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.custom-cursor {
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  mix-blend-mode: difference;
+  transition: transform 0.1s ease-out;
+}
+
+.custom-cursor-follower {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  position: fixed;
+  pointer-events: none;
+  z-index: 9998;
+  transition: transform 0.15s ease-out, width 0.3s, height 0.3s;
+}
+
+.noise-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: url('https://grainy-gradients.vercel.app/noise.svg');
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 50;
+}
+
+
